@@ -118,6 +118,7 @@ import mapclassify as mc
 ```{python}
 # Load & merge: airbnb and deprivation
 
+listData = pd.read_csv('data/listings.csv')
 airbnb=pd.read_csv("data/grouped_data.csv")[['GSS_CODE','Count_','average_price']]
 dep=pd.read_excel("data/2019_deprivation.xlsx").drop(columns=['old_ward_code'])
 dep.rename(columns={'NEW_CODE':'GSS_CODE'},inplace=True)
@@ -190,91 +191,91 @@ A parenthetical citation: There are many ways to research Airbnb [see, for examp
 :::
 
 ```{python}
-def get_statistics_feature(data,name):
-    column_values=data[name]
+def getTypeInfo_byhost(data):
+    grouped_price = data.groupby('room_type')['price'].mean().reset_index()
+    grouped_count = data['room_type'].value_counts().reset_index()
     
-    mean = column_values.mean()
-    std = column_values.std()
-    median = column_values.median()
-    quartiles = column_values.quantile([0.25, 0.5, 0.75])
+    top_hosts = data['host_id'].value_counts().nlargest(10).index.tolist()
+    top_hosts_data = data[data['host_id'].isin(top_hosts)]
     
-    plt.figure(figsize=(10, 5))
+    sorted_hosts = top_hosts_data.groupby('host_id').size().sort_values(ascending=False).index.tolist()
     
-    plt.subplot(1, 2, 1)
-    sns.boxplot(y=column_values)
-    plt.title(f'Boxplot of {name}')
+    top_hosts_data['host_id'] = pd.Categorical(top_hosts_data['host_id'], categories=sorted_hosts, ordered=True)
+    top_hosts_data = top_hosts_data.sort_values('host_id')
     
-    plt.subplot(1, 2, 2)
-    sns.histplot(column_values, kde=True)
-    plt.axvline(mean, color='r', linestyle='--', label=f'Mean: {mean:.2f}')
-    plt.axvline(median, color='g', linestyle='-', label=f'Median: {median:.4f}')
-    plt.xlabel('Values')
-    plt.ylabel('Frequency')
-    plt.legend()
-    plt.title(f'Distribution of {name}')
+    grouped_count_host = top_hosts_data.groupby(['host_id', 'room_type']).size().unstack().fillna(0)
+    grouped_price_host = top_hosts_data.groupby(['host_id', 'room_type'])['price'].mean().unstack().fillna(0)
+    
+    fig, ax = plt.subplots(2, 2, figsize=(18, 12))
+
+    ax[0, 0].bar(grouped_count['room_type'], grouped_count['count'])
+    ax[0, 0].set_xlabel('Room Type')
+    ax[0, 0].set_ylabel('Count')
+    ax[0, 0].set_title('Room Count by Type')
+    
+    ax[0, 1].bar(grouped_price['room_type'], grouped_price['price'])
+    ax[0, 1].set_xlabel('Room Type')
+    ax[0, 1].set_ylabel('Average Price')
+    ax[0, 1].set_title('Average Price by Room Type')
+    
+    grouped_count_host.plot(kind='bar', stacked=True, colormap='coolwarm', ax=ax[1, 0])
+    ax[1, 0].set_xlabel('Host Name')
+    ax[1, 0].set_ylabel('Number of Properties')
+    ax[1, 0].set_title('Number of Properties by Host ID and Room Type (Top 10 Hosts)')
+    ax[1, 0].legend(title='Room Type')
+    ax[1, 0].set_xticks(range(len(sorted_hosts)))
+    ax[1, 0].set_xticklabels([top_hosts_data[top_hosts_data['host_id'] == host_id]['host_name'].iloc[0] for host_id in sorted_hosts], rotation=45)
+    
+    grouped_price_host.plot(kind='bar', stacked=True, colormap='coolwarm', ax=ax[1, 1])
+    ax[1, 1].set_xlabel('Host Name')
+    ax[1, 1].set_ylabel('Average Price')
+    ax[1, 1].set_title('Average Price by Host ID and Room Type (Top 10 Hosts)')
+    ax[1, 1].legend(title='Room Type')
+    ax[1, 1].set_xticks(range(len(sorted_hosts)))
+    ax[1, 1].set_xticklabels([top_hosts_data[top_hosts_data['host_id'] == host_id]['host_name'].iloc[0] for host_id in sorted_hosts], rotation=45)
     
     plt.tight_layout()
+    plt.savefig("roomtype_info.png")
     plt.show()
-    print(f'The standard deviation of {name} is: {std}')
+
+getTypeInfo_byhost(listData)
 ```
 
 ```{python}
-get_statistics_feature(rawData,"Count_")
-get_statistics_feature(rawData,"average_price")
-```
-
-```{python}
-def get_kde(airbnb_gdf,map):
-    airbnb_gdf = airbnb_gdf.to_crs(epsg=3857)
+def get_kde(gdf,map):
+    gdf = gdf.to_crs(epsg=3857)
     myMap = map.to_crs(epsg=3857)
-    
-    # calculate KDE
-    
-    longitude = airbnb_gdf.geometry.x
-    latitude = airbnb_gdf.geometry.y
-    
+    longitude = gdf.geometry.x
+    latitude = gdf.geometry.y
     xy = np.vstack([longitude, latitude])
-    kde = gaussian_kde(xy, bw_method= 'silverman') # bw_method='scott' bw_method='silverman' bw_method=0.1
     
-    grid_x, grid_y = np.mgrid[longitude.min():longitude.max():200j, latitude.min():latitude.max():200j]
-    grid_coords = np.vstack([grid_x.ravel(), grid_y.ravel()])
-    z = kde(grid_coords).reshape(grid_x.shape)
-    
-    # plot
-    
+    kde = gaussian_kde(xy, bw_method= 'silverman')   
+    x, y = np.mgrid[longitude.min():longitude.max():200j, latitude.min():latitude.max():200j]
+    coords = np.vstack([x.ravel(), y.ravel()])
+    z = kde(coords).reshape(x.shape)
     fig, ax = plt.subplots(figsize=(20, 20))
-    
-    # plot London borough
     myMap.plot(ax=ax, color='none', edgecolor='black', zorder=2)
     
-    # plot kernel density layers
-    im = ax.imshow(z, origin='lower', extent=[longitude.min(), longitude.max(), latitude.min(), latitude.max()], cmap=plt.cm.hot_r, alpha=0.6, zorder=3)
+    im = ax.imshow(z, origin='lower', extent=[longitude.min(), longitude.max(), latitude.min(), latitude.max()], alpha=0.6, zorder=3)
     
-    # plot OpenStreetMap 
+    # An error might occur due to the OSM serverer delay. If it happens, please comment the following line of code.
+    # This will ensure operation of the whole program, but it may involve making some minor aesthetic sacrifices in the output chart.
     ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zorder=1)
     
-    # adjusting the axes to fit the drawing
     ax.set_xlim(longitude.min(), longitude.max())
     ax.set_ylim(latitude.min(), latitude.max())
-    
-    # add a colour bar
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+    ax.set_title('London Airbnb')
     cbar = plt.colorbar(im, ax=ax, orientation='vertical', fraction=0.036, pad=0.04)
     cbar.set_label('Density')
     
-    # set x,y axis
-    ax.set_xlabel('Longitude')
-    ax.set_ylabel('Latitude')
-    
-    # set title
-    ax.set_title('Airbnb Hotspots in London with OpenStreetMap Basemap')
-    
     plt.show()
     
-listData = pd.read_csv('data/listings.csv')
 geometry = [Point(xy) for xy in zip(listData['longitude'], listData['latitude'])]
 crs = {'init': 'epsg:4326'} 
-airbnb_gdf = gpd.GeoDataFrame(listData, geometry=geometry, crs=crs)
-get_kde(airbnb_gdf,map)
+gdf = gpd.GeoDataFrame(listData, geometry=geometry, crs=crs)
+get_kde(gdf,map)
 ```
 
 ## 7. Drawing on your previous answers, and supporting your response with evidence (e.g. figures, maps, and statistical analysis/models), how *could* this data set be used to inform the regulation of Short-Term Lets (STL) in London? 
@@ -358,11 +359,11 @@ def run_gwr(myData,y_column,x_column):
 
 # The following code throws an error and interrupt on some of our group members' computer while others are not. 
 # If an error occurs, please comment the next line, so that the output of coefficient visualisation would not be affected.
-    print(gwr_results.summary())
+    # print(gwr_results.summary())
     
     gdf['coe'] = gwr_results.params[:, 1]
     # gdf['r2'] = gwr_results.localR2
-    # gdf['r2'] = np.clip(gdf['r2'], -1, 1)
+    # gdf['r2'] = np.clip(gdf['r2'], 0, 1)
 
     # classifier_r2 = mc.NaturalBreaks(y=myData[y_column], k=5)
     classifier_coe = mc.NaturalBreaks(y=myData[x_column], k=5)
@@ -370,13 +371,13 @@ def run_gwr(myData,y_column,x_column):
     # gdf['r2_classified'] = gdf['r2'].apply(classifier_r2)
     gdf['coe_classified'] = gdf['coe'].apply(classifier_coe)
     
-    fig, ax = plt.subplots(1,figsize=(18, 9))
+    fig, ax = plt.subplots(figsize=(18, 9))
     # gdf.plot(column='r2', cmap='coolwarm', legend=True, ax=ax[0])
-    gdf.plot(column='coe', cmap='coolwarm', legend=True, ax=ax[1])
+    gdf.plot(column='coe', cmap='coolwarm', legend=True, ax=ax)
     # ax[0].set_title('GWR R2 Result '+ y_column+'~'+x_column)
     # ax[0].axis('off')
-    ax[0].set_title('GWR Result '+ y_column+'~'+x_column)
-    ax[0].axis('off')
+    ax.set_title('GWR Result '+ y_column+'~'+x_column)
+    ax.axis('off')
     plt.savefig(f"{x_column}~{y_column}.png")
     plt.show()
 ```
