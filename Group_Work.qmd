@@ -1,7 +1,7 @@
 ---
 bibliography: bio.bib
 csl: harvard-cite-them-right.csl
-title: Group Name's Group Project
+title: python high's Exploring Airbnb's Spatial Distribution Patterns and Links to Deprivation
 execute:
   echo: false
 format:
