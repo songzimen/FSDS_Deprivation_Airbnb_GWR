@@ -116,6 +116,31 @@ import mapclassify as mc
 ```
 
 ```{python}
+#Data preprocess
+
+
+# def dataPreprocess():
+#     listData = pd.read_csv('data/listings.csv')
+#     listData['latitude'] = listData['latitude'].astype(float)
+#     listData['longitude'] = listData['longitude'].astype(float)
+#     listData['price'] = listData['price'].astype(float)   
+#     map=gpd.read_file('data/London_Ward_CityMerged.shp')[['GSS_CODE','geometry']]
+    
+#     geometry = [Point(xy) for xy in zip(listData['longitude'], listData['latitude'])]
+#     crs = {'init': 'epsg:4326'}    
+#     listData_gdf = gpd.GeoDataFrame(listData, crs=crs, geometry=geometry)[['price','geometry']]
+#     map_gdf = map.to_crs(crs)
+    
+#     merged_data = gpd.sjoin(map_gdf, listData_gdf, how='left', op='contains')   
+#     ward_summary = merged_data.groupby('GSS_CODE').agg({'price': ['count', 'mean']}).reset_index()
+#     ward_summary.columns = ['GSS_CODE', 'Count_', 'average_price']
+
+#     ward_summary.to_csv("grouped_data.csv",index=False)
+
+# dataPreprocess()
+```
+
+```{python}
 # Load & merge: airbnb and deprivation
 
 listData = pd.read_csv('data/listings.csv')
@@ -235,7 +260,7 @@ def getTypeInfo_byhost(data):
     ax[1, 1].set_xticklabels([top_hosts_data[top_hosts_data['host_id'] == host_id]['host_name'].iloc[0] for host_id in sorted_hosts], rotation=45)
     
     plt.tight_layout()
-    plt.savefig("roomtype_info.png")
+    # plt.savefig("roomtype_info.png")
     plt.show()
 
 getTypeInfo_byhost(listData)
@@ -293,9 +318,9 @@ get_kde(gdf,map)
 def global_moran(myData, columnName):
     gdf = myData[[columnName, "geometry"]]
 
-    ax = myData.plot(figsize=(8, 8), column=columnName,legend=True)
-    ax.set_axis_off()
-    plt.savefig('average_price_for_' + columnName + '.png')
+    # ax = myData.plot(figsize=(8, 8), column=columnName,legend=True)
+    # ax.set_axis_off()
+    # plt.savefig('average_price_for_' + columnName + '.png')
 
     wq = lps.weights.Queen.from_dataframe(gdf)
     wq.transform = "r"
@@ -308,10 +333,10 @@ def global_moran(myData, columnName):
     #     origin = centroids[k]
     #     for neigh in neighs:
     #         segment = centroids[[k, neigh]]
-    #         # plt.plot(segment.x, segment.y, "-")
-    plt.axis("off")
-    plt.savefig('weight_matrix_for_' + columnName + '.png')
-    plt.show()
+    #         plt.plot(segment.x, segment.y, "-")
+    # plt.axis("off")
+    # plt.savefig('weight_matrix_for_' + columnName + '.png')
+    # plt.show()
 
     y = gdf[columnName]
     mi = esda.moran.Moran(y, wq)
@@ -321,11 +346,12 @@ def global_moran(myData, columnName):
     print("The p-value of the z-test under random distribution hypothesis: ", mi.p_rand)
     print("The z-test value under normal distribution hypothesis: ", mi.z_norm)
     print("The p-value of the Z test under normal distribution hypothesis: ", mi.p_norm)
+    print("")
 
-    plot_moran(mi, zstandard=True, figsize=(10, 4))
-    plt.legend(['Moran Scatter'])
-    plt.savefig('Moran Scatter_for_' + columnName + '.png')
-    plt.show()
+    # plot_moran(mi, zstandard=True, figsize=(10, 4))
+    # plt.legend(['Moran Scatter'])
+    # plt.savefig('Moran Scatter_for_' + columnName + '.png')
+    # plt.show()
 ```
 
 ```{python}
@@ -334,72 +360,95 @@ global_moran(myData, "Count_")
 ```
 
 ```{python}
-# GWR
+# Calculate Local Moran's I
 
-def run_gwr(myData,y_column,x_column):
-    gdf=myData[[y_column,x_column,'geometry']]
-    gdf['centro']=gdf.geometry.centroid
-    gdf['X']=gdf.centro.x
-    gdf['Y']=gdf.centro.y
-    coords = list(zip(gdf['X'],gdf['Y']))
-    
-    y=gdf[y_column].values.reshape((-1,1))
-    y = (y - y.mean(axis=0)) / y.std(axis=0)
-    X=gdf[[x_column]].values
-    X = (X - X.mean(axis=0)) / X.std(axis=0)
-    
-    sel = Sel_BW(coords, y, X)
-    bw = sel.search()
-    print('bw:', bw)
-    gwr = GWR(coords, y, X, bw)
-    gwr_results = gwr.fit()
-    print('aicc:', gwr_results.aicc)
-    print('ENP:', gwr_results.ENP)
-    print('sigma2:', gwr_results.sigma2)
-
-# The following code throws an error and interrupt on some of our group members' computer while others are not. 
-# If an error occurs, please comment the next line, so that the output of coefficient visualisation would not be affected.
-    # print(gwr_results.summary())
-    
-    gdf['coe'] = gwr_results.params[:, 1]
-    # gdf['r2'] = gwr_results.localR2
-    # gdf['r2'] = np.clip(gdf['r2'], 0, 1)
-
-    # classifier_r2 = mc.NaturalBreaks(y=myData[y_column], k=5)
-    classifier_coe = mc.NaturalBreaks(y=myData[x_column], k=5)
-
-    # gdf['r2_classified'] = gdf['r2'].apply(classifier_r2)
-    gdf['coe_classified'] = gdf['coe'].apply(classifier_coe)
-    
-    fig, ax = plt.subplots(figsize=(18, 9))
-    # gdf.plot(column='r2', cmap='coolwarm', legend=True, ax=ax[0])
-    gdf.plot(column='coe', cmap='coolwarm', legend=True, ax=ax)
-    # ax[0].set_title('GWR R2 Result '+ y_column+'~'+x_column)
-    # ax[0].axis('off')
-    ax.set_title('GWR Result '+ y_column+'~'+x_column)
-    ax.axis('off')
-    plt.savefig(f"{x_column}~{y_column}.png")
+def local_moran(myData, columnName):
+    gdf = myData[[columnName, "geometry", "GSS_CODE"]]
+    y = gdf[columnName].values
+    w = lps.weights.distance.Kernel.from_dataframe(gdf, fixed=False, k=15)
+    w.transform = "r"
+    moran_loc = Moran_Local(y, w)
+    loc_moran_df = pd.DataFrame(
+        {"Wrad Code": gdf["GSS_CODE"], "loc_moran": moran_loc.Is}
+    )
+    # display(loc_moran_df)
+    # fig, ax = moran_scatterplot(moran_loc, p=0.1, aspect_equal=True)
+    # ax.set_title('Local Moran Scatterplot for ' + columnName)
+    # plt.legend(['Moran Scatter'])
+    # plt.savefig('Local_Moran_Scatterplot_for_' + columnName + '.png')
+    # plt.show()
+    fig, ax = lisa_cluster(moran_loc, gdf, p=0.1, figsize=(9, 9))
+    ax.set_title('LISA Cluster Map for ' + columnName)
+    # plt.savefig('LISA_Cluster_Map_for_' + columnName + '.png')
     plt.show()
 ```
 
 ```{python}
-run_gwr(myData,"average_price","Income Score (rate)")
-run_gwr(myData,"average_price","Employment Score (rate)")
-run_gwr(myData,"average_price","Education, Skills and Training Score")
-run_gwr(myData,"average_price","Health Deprivation and Disability Score")
-run_gwr(myData,"average_price","Crime Score")
-run_gwr(myData,"average_price","Barriers to Housing and Services Score")
-run_gwr(myData,"average_price","Living Environment Score")
+local_moran(myData, "average_price")
+local_moran(myData, "Count_")
 ```
 
 ```{python}
-run_gwr(myData,"Count_","Income Score (rate)")
-run_gwr(myData,"Count_","Employment Score (rate)")
-run_gwr(myData,"Count_","Education, Skills and Training Score")
-run_gwr(myData,"Count_","Health Deprivation and Disability Score")
-run_gwr(myData,"Count_","Crime Score")
-run_gwr(myData,"Count_","Barriers to Housing and Services Score")
-run_gwr(myData,"Count_","Living Environment Score")
+# GWR
+
+def run_gwr(myData,y_column):
+    x_list=["Employment Score (rate)",
+     "Education, Skills and Training Score",
+     "Health Deprivation and Disability Score",
+     "Crime Score",
+     "Barriers to Housing and Services Score",
+     "Living Environment Score"]
+    fig, ax = plt.subplots(2,3,figsize=(18, 9))
+    
+    for i, x_column in enumerate(x_list):
+        row = i // 3
+        col = i % 3
+       
+        gdf=myData[[y_column,x_column,'geometry']].copy()
+        gdf['centro']=gdf.geometry.centroid
+        gdf['X']=gdf.centro.x
+        gdf['Y']=gdf.centro.y
+        coords = list(zip(gdf['X'],gdf['Y']))
+        
+        y=gdf[y_column].values.reshape((-1,1))
+        y = (y - y.mean(axis=0)) / y.std(axis=0)
+        X=gdf[[x_column]].values
+        X = (X - X.mean(axis=0)) / X.std(axis=0)
+        
+        sel = Sel_BW(coords, y, X)
+        bw = sel.search()
+        # print('bw:', bw)
+        gwr = GWR(coords, y, X, bw)
+        gwr_results = gwr.fit()
+        # print('aicc:', gwr_results.aicc)
+        # print('ENP:', gwr_results.ENP)
+        # print('sigma2:', gwr_results.sigma2)
+
+    # The following code throws an error and interrupt on some of our group members' computer while others are not. 
+    # If an error occurs, please comment the next line, so that the output of coefficient visualisation would not be affected.
+        print(gwr_results.summary())
+        
+        gdf['coe'] = gwr_results.params[:, 1]
+        # gdf['r2'] = gwr_results.localR2
+        # gdf['r2'] = np.clip(gdf['r2'], 0, 1)
+    
+        # classifier_r2 = mc.NaturalBreaks(y=myData[y_column], k=5)
+        classifier_coe = mc.NaturalBreaks(y=myData[x_column], k=5)
+    
+        # gdf['r2_classified'] = gdf['r2'].apply(classifier_r2)
+        gdf['coe_classified'] = gdf['coe'].apply(classifier_coe)
+        
+        # gdf.plot(column='r2', cmap='coolwarm', legend=True, ax=ax[0])
+        gdf.plot(column='coe', cmap='coolwarm', legend=True, ax=ax[row, col])
+        ax[row, col].set_title(f"{y_column}-{x_column}")
+        ax[row, col].axis('off')
+    # plt.savefig(f"{x_column}~{y_column}.png")
+    plt.show()
+```
+
+```{python}
+run_gwr(myData,"average_price")
+run_gwr(myData,"Count_")
 ```
 
 ## Sustainable Authorship Tools
