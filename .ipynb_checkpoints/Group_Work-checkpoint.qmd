@@ -50,22 +50,30 @@ jupyter:
 
 ## Declaration of Authorship {.unnumbered .unlisted}
 
-We, [insert your group's names], confirm that the work presented in this assessment is our own. Where information has been derived from other sources, we confirm that this has been indicated in the work. Where a Large Language Model such as ChatGPT has been used we confirm that we have made its contribution to the final submission clear.
+We, \[python high Group\], confirm that the work presented in this assessment is our own. Where information has been derived from other sources, we confirm that this has been indicated in the work. Where a Large Language Model such as ChatGPT has been used we confirm that we have made its contribution to the final submission clear.
 
-Date:
+Date: 19/December/2023
 
-Student Numbers: 
+Student Numbers: 23237413, 23212209, 23075581, 23092081, 23041170
 
 ## Brief Group Reflection
 
-| What Went Well | What Was Challenging |
-| -------------- | -------------------- |
-| A              | B                    |
-| C              | D                    |
+Went well:
+
+1.The selected analysis method effectively analyzes the spatial differentiation characteristics of the relationship between Airbnb and deprivation index.\
+2.The findings of the study are well suited to complement the policy
+
+challenge：
+
+1.The large amount of data in Airbnb's data set poses a challenge to the preprocess of data
+
+2.Choosing the right parameters and specifications for the GWR model and getting the model to run successfully in JupyterLab was a challenge.
 
 ## Priorities for Feedback
 
 Are there any areas on which you would appreciate more detailed feedback if we're able to offer it?
+
+We would like to get feedback on methodology, especially the use of GWR. Also, we would like the feedback on the broader implications of findings and suggestions for policy recommendations to help us enhance the practical relevance.
 
 ```{=html}
 <style type="text/css">
@@ -83,55 +91,61 @@ Are there any areas on which you would appreciate more detailed feedback if we'r
 }
 </style>
 ```
-
 {{< pagebreak >}}
 
 # Response to Questions
+
+This study explores the spatial distribution pattern of Airbnb using cluster analysis and constructs its relationship with Deprivation using the GWR model, which aims to provide a evidence for optimising Airbnb's policy and management mode. The materials needed for the study have been saved in the following link, to avoid errors, please download the data directly when reproducing the code.
+
 https://github.com/songzimen/FSDS_Deprivation_Airbnb_GWR.git
 
 ```{python}
+#| jupyter: {source_hidden: true}
 # Import libs
 
-import esda  
-import pandas as pd
-import geopandas as gpd
-from geopandas import GeoDataFrame
-import libpysal as lps
-import numpy as np
-import matplotlib.pyplot as plt
-from shapely.geometry import Point
 import contextily as ctx
-from pylab import figure, scatter, show
-%matplotlib inline
-from splot.esda import plot_moran
-from splot.esda import moran_scatterplot
-from esda.moran import Moran_Local
-from splot.esda import lisa_cluster
-from splot.esda import plot_local_autocorrelation
-from mgwr.sel_bw import Sel_BW
-from mgwr.gwr import GWR, MGWR
-import seaborn as sns
-from scipy.stats import gaussian_kde
+import esda
+import geopandas as gpd
+import libpysal as lps
 import mapclassify as mc
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from esda.moran import Moran_Local
+from geopandas import GeoDataFrame
+from mgwr.gwr import GWR, MGWR
+from mgwr.sel_bw import Sel_BW
+from pylab import figure, scatter, show
+from scipy.stats import gaussian_kde
+from shapely.geometry import Point
+
+%matplotlib inline
+from splot.esda import (
+    lisa_cluster,
+    moran_scatterplot,
+    plot_local_autocorrelation,
+    plot_moran,
+)
 ```
 
 ```{python}
-#Data preprocess
+# Data preprocess
 
 
 # def dataPreprocess():
 #     listData = pd.read_csv('data/listings.csv')
 #     listData['latitude'] = listData['latitude'].astype(float)
 #     listData['longitude'] = listData['longitude'].astype(float)
-#     listData['price'] = listData['price'].astype(float)   
+#     listData['price'] = listData['price'].astype(float)
 #     map=gpd.read_file('data/London_Ward_CityMerged.shp')[['GSS_CODE','geometry']]
-    
+
 #     geometry = [Point(xy) for xy in zip(listData['longitude'], listData['latitude'])]
-#     crs = {'init': 'epsg:4326'}    
+#     crs = {'init': 'epsg:4326'}
 #     listData_gdf = gpd.GeoDataFrame(listData, crs=crs, geometry=geometry)[['price','geometry']]
 #     map_gdf = map.to_crs(crs)
-    
-#     merged_data = gpd.sjoin(map_gdf, listData_gdf, how='left', op='contains')   
+
+#     merged_data = gpd.sjoin(map_gdf, listData_gdf, how='left', op='contains')
 #     ward_summary = merged_data.groupby('GSS_CODE').agg({'price': ['count', 'mean']}).reset_index()
 #     ward_summary.columns = ['GSS_CODE', 'Count_', 'average_price']
 
@@ -143,49 +157,54 @@ import mapclassify as mc
 ```{python}
 # Load & merge: airbnb and deprivation
 
-listData = pd.read_csv('data/listings.csv')
-airbnb=pd.read_csv("data/grouped_data.csv")[['GSS_CODE','Count_','average_price']]
-dep=pd.read_excel("data/2019_deprivation.xlsx").drop(columns=['old_ward_code'])
-dep.rename(columns={'NEW_CODE':'GSS_CODE'},inplace=True)
+listData = pd.read_csv("data/listings.csv")
+airbnb = pd.read_csv("data/grouped_data.csv")[["GSS_CODE", "Count_", "average_price"]]
+dep = pd.read_excel("data/2019_deprivation.xlsx").drop(columns=["old_ward_code"])
+dep.rename(columns={"NEW_CODE": "GSS_CODE"}, inplace=True)
 
-rawData=pd.merge(dep, airbnb, on='GSS_CODE', how='inner')
-rawData['average_price'] = pd.to_numeric(rawData['average_price'], errors='coerce')
-display(rawData)
+rawData = pd.merge(dep, airbnb, on="GSS_CODE", how="inner")
+rawData["average_price"] = pd.to_numeric(rawData["average_price"], errors="coerce")
 ```
 
 ```{python}
 # Load & plot: London ward (city merged)
 # Merge & View: data & map
 
-map=gpd.read_file('data/London_Ward_CityMerged.shp')[['GSS_CODE','geometry']]
-myData=pd.merge(rawData, map, on='GSS_CODE', how='inner')
-myData=gpd.GeoDataFrame(myData)
+map = gpd.read_file("data/London_Ward_CityMerged.shp")[["GSS_CODE", "geometry"]]
+myData = pd.merge(rawData, map, on="GSS_CODE", how="inner")
+myData = gpd.GeoDataFrame(myData)
 # myData.to_csv('data.csv',index=False)
 ```
 
 ## 1. Who collected the data?
 
-::: {.duedate}
+:::
+
+The dataset for the study consists of two parts. The Airbnb data comes from **Inside Airbnb** @insideairbnb, while the Deprivation data is from **the Department for Levelling Up, Housing & Communities** @englishindices2019, which is part of the UK government.
 
 ( 2 points; Answer due Week 7 )
 
 :::
 
-An inline citation: As discussed on @insideairbnb, there are many...
-
-A parenthetical citation: There are many ways to research Airbnb [see, for example, @insideairbnb]... 
-
 ## 2. Why did they collect it?
 
-::: {.duedate}
+:::
+
+Inside Airbnb collects publicly available data from the Airbnb website to provide data and advocacy about Airbnb's impact on residential communities. Their aim is to enable residents to better understand and decide how to manage the affairs of renting out their homes to tourists and thereby play a greater role in the short-term letting market.
+
+The Department for Levelling Up, Housing & Communities (2019) regards the Deprivation Indices as a useful tool to measure the relative distribution of deprivation within a small area. The dataset is designed to help government and the public better understand socio-economic disparities and optimise decision-making and resource allocation accordingly.
 
 ( 4 points; Answer due Week 7 )
 
 :::
 
-## 3. How was the data collected?  
+## 3. How was the data collected?
 
-::: {.duedate}
+::
+
+**Inside Airbnb**, created by tech expert Murray Cox and supported by many urban research specialists, uses a suite of open-source technologies, including D3, Bootstrap, Python, PostgreSQL, and Google Fonts for compiling and analyzing publicly available data from the Airbnb platform.
+
+**The deprivation data**, as detailed in the "English Indices of Deprivation 2019" document, is gathered using a comprehensive approach. This process involves the collection and integration of various socio-economic indicators from multiple government data sources. These indicators cover diverse aspects such as income, employment, education, health, crime, and barriers to housing and services. The data is then meticulously compiled to create a detailed picture of socio-economic conditions across geographic areas. This method ensures an accurate and multi-faceted view of deprivation at a localized level.
 
 ( 5 points; Answer due Week 8 )
 
@@ -193,123 +212,203 @@ A parenthetical citation: There are many ways to research Airbnb [see, for examp
 
 ## 4. How does the method of collection impact the completeness and/or accuracy of its representation of the process it seeks to study, and what wider issues does this raise?
 
-::: {.duedate}
+### 4.1 Data Source and Timing
+
+The Deprivation Indices are based on comprehensive statistical data  from various government departments, each with different data collection frequencies and scales. This results in extended intervals between updates (2007, 2010, 2015, 2019). Any changes in data collection frameworks by these departments can significantly impact the indices. Particularly, the lack of updates during pivotal events like the 2020-2022 global pandemic might limit the dataset's current relevance to urban development. In contrast, Airbnb's data is more dynamic and frequently updated, capturing immediate changes despite being sourced solely from an online platform. These differences in update frequency and source create disparities in temporal scales between the two datasets, posing challenges in accurately linking Airbnb's influence on community deprivation.
+
+### 4.2 Data Quality and Reliability
+
+The Indices of Deprivation benefit from stringent quality assurance processes, including comprehensive checks and validation. In contrast, the collection methods for Airbnb data, such as web scraping or API, might adhere to different standards of quality control. This variation in quality assurance practices could affect the reliability of the Airbnb data, especially when it's compared with the well-validated Deprivation Indices. Such differences in data quality and control methods highlight potential challenges in assessing the datasets' comparability and reliability.
+
+### 4.3 Wider Issues
+
+-   **Dynamic Relationship:** The link between Airbnb's presence and community deprivation is constantly evolving, reflecting changes in Airbnb's market status. This fluidity must be carefully considered during analysis.
+
+-   **Timeframe Discrepancies:** The different update intervals of the Deprivation Indices and Airbnb data can lead to challenges in accurately depicting their current relationship. Airbnb's real-time updates, influenced by timely and specific factors, add another layer of complexity.
+
+-   **Data Quality and Ethical Implications:** The quality and reliability of Airbnb's data, potentially less controlled than the Deprivation Indices, introduce ethical concerns. Variations in data accuracy or potential biases could significantly affect the credibility of the research findings.
 
 ( 11 points; Answer due Week 9 )
 
 :::
 
-## 5. What ethical considerations does the use of this data raise? 
+## 5. What ethical considerations does the use of this data raise?
 
-::: {.duedate}
+### 5.1 Privacy and Data Protection
+
+Handling both the Indices of Deprivation and Airbnb data demands strict privacy considerations. Sensitive details, like host names or personal photos, should be carefully excluded or anonymized. Any unavoidable use of such private data requires stringent protective measures and necessary permissions to ensure compliance with data protection laws.
+
+### 5.2 Potential Stigmatization
+
+The combined use of deprivation indices and Airbnb data carries the risk of inadvertently stigmatizing certain areas as "deprived" or "underprivileged." This could  influence public perception and economic activities in these regions, affecting local residents and potentially skewing Airbnb investment and user preferences.
+
+### 5.3 Bias and Accuracy in Data Representation
+
+The varying data collection methods and update frequencies between the two datasets might lead to biases. Ethical research practices necessitate transparent acknowledgment of these potential biases and limitations of the study.
+
+### 5.4 Responsibility in Data Interpretation
+
+Researchers must responsibly interpret and present their findings, considering the dynamic nature of Airbnb's market influence and the socio-economic factors reflected in the deprivation data.
 
 ( 18 points; Answer due {{< var assess.group-date >}} )
 
 :::
 
-## 6. With reference to the data (*i.e.* using numbers, figures, maps, and descriptive statistics), what does an analysis of Hosts and Listing types suggest about the nature of Airbnb lets in London? 
+## 6. With reference to the data (*i.e.* using numbers, figures, maps, and descriptive statistics), what does an analysis of Hosts and Listing types suggest about the nature of Airbnb lets in London?
 
-::: {.duedate}
+The provided image below presents an analysis of Airbnb's room types in London, focusing on the quantity and average price, alongside a detailed view of the top 10 hosts' offerings. Here are the refined key insights.
+
+-   "Entire home/apt" is the predominant listing category and, together with "Hotel room", garners a higher price point than other accommodation types.
+
+-   The majority of the most active hosts in London list "Entire home/apt" options, suggesting a prevalent strategy of renting out entire properties.
+
+-   There's a notable diversity in listing prices across room types and hosts, implying that prices are set variably based on location, property quality, and the services provided.
 
 ( 15 points; Answer due {{< var assess.group-date >}} )
 
 :::
 
 ```{python}
+#| jupyter: {source_hidden: true}
 def getTypeInfo_byhost(data):
-    grouped_price = data.groupby('room_type')['price'].mean().reset_index()
-    grouped_count = data['room_type'].value_counts().reset_index()
-    
-    top_hosts = data['host_id'].value_counts().nlargest(10).index.tolist()
-    top_hosts_data = data[data['host_id'].isin(top_hosts)]
-    
-    sorted_hosts = top_hosts_data.groupby('host_id').size().sort_values(ascending=False).index.tolist()
-    
-    top_hosts_data['host_id'] = pd.Categorical(top_hosts_data['host_id'], categories=sorted_hosts, ordered=True)
-    top_hosts_data = top_hosts_data.sort_values('host_id')
-    
-    grouped_count_host = top_hosts_data.groupby(['host_id', 'room_type']).size().unstack().fillna(0)
-    grouped_price_host = top_hosts_data.groupby(['host_id', 'room_type'])['price'].mean().unstack().fillna(0)
-    
+    grouped_price = data.groupby("room_type")["price"].mean().reset_index()
+    grouped_count = data["room_type"].value_counts().reset_index()
+
+    top_hosts = data["host_id"].value_counts().nlargest(10).index.tolist()
+    top_hosts_data = data[data["host_id"].isin(top_hosts)]
+
+    sorted_hosts = (
+        top_hosts_data.groupby("host_id")
+        .size()
+        .sort_values(ascending=False)
+        .index.tolist()
+    )
+
+    top_hosts_data["host_id"] = pd.Categorical(
+        top_hosts_data["host_id"], categories=sorted_hosts, ordered=True
+    )
+    top_hosts_data = top_hosts_data.sort_values("host_id")
+
+    grouped_count_host = (
+        top_hosts_data.groupby(["host_id", "room_type"]).size().unstack().fillna(0)
+    )
+    grouped_price_host = (
+        top_hosts_data.groupby(["host_id", "room_type"])["price"]
+        .mean()
+        .unstack()
+        .fillna(0)
+    )
+
     fig, ax = plt.subplots(2, 2, figsize=(18, 12))
 
-    ax[0, 0].bar(grouped_count['room_type'], grouped_count['count'])
-    ax[0, 0].set_xlabel('Room Type')
-    ax[0, 0].set_ylabel('Count')
-    ax[0, 0].set_title('Room Count by Type')
-    
-    ax[0, 1].bar(grouped_price['room_type'], grouped_price['price'])
-    ax[0, 1].set_xlabel('Room Type')
-    ax[0, 1].set_ylabel('Average Price')
-    ax[0, 1].set_title('Average Price by Room Type')
-    
-    grouped_count_host.plot(kind='bar', stacked=True, colormap='coolwarm', ax=ax[1, 0])
-    ax[1, 0].set_xlabel('Host Name')
-    ax[1, 0].set_ylabel('Number of Properties')
-    ax[1, 0].set_title('Number of Properties by Host ID and Room Type (Top 10 Hosts)')
-    ax[1, 0].legend(title='Room Type')
+    ax[0, 0].bar(grouped_count["room_type"], grouped_count["count"])
+    ax[0, 0].set_xlabel("Room Type")
+    ax[0, 0].set_ylabel("Count")
+    ax[0, 0].set_title("Room Count by Type")
+
+    ax[0, 1].bar(grouped_price["room_type"], grouped_price["price"])
+    ax[0, 1].set_xlabel("Room Type")
+    ax[0, 1].set_ylabel("Average Price")
+    ax[0, 1].set_title("Average Price by Room Type")
+
+    grouped_count_host.plot(kind="bar", stacked=True, colormap="coolwarm", ax=ax[1, 0])
+    ax[1, 0].set_xlabel("Host Name")
+    ax[1, 0].set_ylabel("Number of Properties")
+    ax[1, 0].set_title("Number of Properties by Host ID and Room Type (Top 10 Hosts)")
+    ax[1, 0].legend(title="Room Type")
     ax[1, 0].set_xticks(range(len(sorted_hosts)))
-    ax[1, 0].set_xticklabels([top_hosts_data[top_hosts_data['host_id'] == host_id]['host_name'].iloc[0] for host_id in sorted_hosts], rotation=45)
-    
-    grouped_price_host.plot(kind='bar', stacked=True, colormap='coolwarm', ax=ax[1, 1])
-    ax[1, 1].set_xlabel('Host Name')
-    ax[1, 1].set_ylabel('Average Price')
-    ax[1, 1].set_title('Average Price by Host ID and Room Type (Top 10 Hosts)')
-    ax[1, 1].legend(title='Room Type')
+    ax[1, 0].set_xticklabels(
+        [
+            top_hosts_data[top_hosts_data["host_id"] == host_id]["host_name"].iloc[0]
+            for host_id in sorted_hosts
+        ],
+        rotation=45,
+    )
+
+    grouped_price_host.plot(kind="bar", stacked=True, colormap="coolwarm", ax=ax[1, 1])
+    ax[1, 1].set_xlabel("Host Name")
+    ax[1, 1].set_ylabel("Average Price")
+    ax[1, 1].set_title("Average Price by Host ID and Room Type (Top 10 Hosts)")
+    ax[1, 1].legend(title="Room Type")
     ax[1, 1].set_xticks(range(len(sorted_hosts)))
-    ax[1, 1].set_xticklabels([top_hosts_data[top_hosts_data['host_id'] == host_id]['host_name'].iloc[0] for host_id in sorted_hosts], rotation=45)
-    
+    ax[1, 1].set_xticklabels(
+        [
+            top_hosts_data[top_hosts_data["host_id"] == host_id]["host_name"].iloc[0]
+            for host_id in sorted_hosts
+        ],
+        rotation=45,
+    )
+
     plt.tight_layout()
     # plt.savefig("roomtype_info.png")
     plt.show()
 
+
 getTypeInfo_byhost(listData)
 ```
 
+The heatmap below illustrates the concentration of Airbnb listings across London, showing a hotspot in the central region that gradually fades outwards. The densest area, highlighted in bright yellow, indicates a cluster of listings located to the east and south of central London, an area known for attractions like Tower Bridge, Canary Wharf, and Greenwich Observatory. This aligns with the bar chart showing a high volume of 'Entire home/apt' listings, suggesting hosts are meeting the strong demand for accommodations in these desirable locations, reflective of London's varied socio-economic landscape.
+
 ```{python}
-def get_kde(gdf,map):
+#| jupyter: {source_hidden: true}
+def get_kde(gdf, map):
     gdf = gdf.to_crs(epsg=3857)
     myMap = map.to_crs(epsg=3857)
     longitude = gdf.geometry.x
     latitude = gdf.geometry.y
     xy = np.vstack([longitude, latitude])
-    
-    kde = gaussian_kde(xy, bw_method= 'silverman')   
-    x, y = np.mgrid[longitude.min():longitude.max():200j, latitude.min():latitude.max():200j]
+
+    kde = gaussian_kde(xy, bw_method="silverman")
+    x, y = np.mgrid[
+        longitude.min() : longitude.max() : 200j, latitude.min() : latitude.max() : 200j
+    ]
     coords = np.vstack([x.ravel(), y.ravel()])
     z = kde(coords).reshape(x.shape)
     fig, ax = plt.subplots(figsize=(20, 20))
-    myMap.plot(ax=ax, color='none', edgecolor='black', zorder=2)
-    
-    im = ax.imshow(z, origin='lower', extent=[longitude.min(), longitude.max(), latitude.min(), latitude.max()], alpha=0.6, zorder=3)
-    
+    myMap.plot(ax=ax, color="none", edgecolor="black", zorder=2)
+
+    im = ax.imshow(
+        z,
+        origin="lower",
+        extent=[longitude.min(), longitude.max(), latitude.min(), latitude.max()],
+        alpha=0.6,
+        zorder=3,
+    )
+
     # An error might occur due to the OSM serverer delay. If it happens, please comment the following line of code.
     # This will ensure operation of the whole program, but it may involve making some minor aesthetic sacrifices in the output chart.
     ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik, zorder=1)
-    
+
     ax.set_xlim(longitude.min(), longitude.max())
     ax.set_ylim(latitude.min(), latitude.max())
-    ax.set_xlabel('Longitude')
-    ax.set_ylabel('Latitude')
-    ax.set_title('London Airbnb')
-    cbar = plt.colorbar(im, ax=ax, orientation='vertical', fraction=0.036, pad=0.04)
-    cbar.set_label('Density')
-    
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title("London Airbnb")
+    cbar = plt.colorbar(im, ax=ax, orientation="vertical", fraction=0.036, pad=0.04)
+    cbar.set_label("Density")
+
     plt.show()
-    
-geometry = [Point(xy) for xy in zip(listData['longitude'], listData['latitude'])]
-crs = {'init': 'epsg:4326'} 
+
+
+geometry = [Point(xy) for xy in zip(listData["longitude"], listData["latitude"])]
+crs = {"init": "epsg:4326"}
 gdf = gpd.GeoDataFrame(listData, geometry=geometry, crs=crs)
-get_kde(gdf,map)
+get_kde(gdf, map)
 ```
 
-## 7. Drawing on your previous answers, and supporting your response with evidence (e.g. figures, maps, and statistical analysis/models), how *could* this data set be used to inform the regulation of Short-Term Lets (STL) in London? 
+## 7. Drawing on your previous answers, and supporting your response with evidence (e.g. figures, maps, and statistical analysis/models), how *could* this data set be used to inform the regulation of Short-Term Lets (STL) in London?
 
-::: {.duedate}
+### 7.1 Introduction: The Rise of the Sharing Economy and the Urgency for Regulation
 
+Amidst the sharing economy's surge, London's STL market, propelled by platforms like Airbnb, has dramatically influenced urban housing and community dynamics, prompting calls for regulation to safeguard housing market stability and community welfare. This study harnesses spatial auto-correlation to assess Airbnb distribution patterns and geographic weighted regression (GWR) to examine the influence of deprivation sub-indicators on these prices. By discerning the geographical distribution of Airbnb and the differential impact of deprivation sub-indicators, the research provides deeper insights for policymakers. The integration of these analyses aims to inform STL regulatory strategies, ensuring market growth aligns with community interests and broad socioeconomic context.
+
+::: duedate
 ( 45 points; Answer due {{< var assess.group-date >}} )
-
 :::
+
+### 7.2 Spatial Patterns Unveiled: Significant Spatial Segregation in Airbnb Listings
+
+Are there spatial distributional disparities in the number and price of Airbnb's in London? If exist, what characteristics do they reflect? To answer this question, the study first conducted a global spatial auto-correlation analysis and calculates the Moran's indices for the two types of spatial data to be 0.76 and 0.43. These results confirm that there are statistically significant spatial distribution differences in both the number of Airbnb listings and the average price of properties across different areas of London.
 
 ```{python}
 # Calculate Gloval Moran's I
@@ -355,12 +454,15 @@ def global_moran(myData, columnName):
 ```
 
 ```{python}
-global_moran(myData, "average_price")
 global_moran(myData, "Count_")
+global_moran(myData, "average_price")
 ```
+
+To delve deeper into the characteristics of the spatial distribution of Airbnb listings and their average pricing, the study performed a local Moran's I analysis. This highlights the clustering of high and low values in different areas (see figure below).
 
 ```{python}
 # Calculate Local Moran's I
+
 
 def local_moran(myData, columnName):
     gdf = myData[[columnName, "geometry", "GSS_CODE"]]
@@ -378,43 +480,51 @@ def local_moran(myData, columnName):
     # plt.savefig('Local_Moran_Scatterplot_for_' + columnName + '.png')
     # plt.show()
     fig, ax = lisa_cluster(moran_loc, gdf, p=0.1, figsize=(9, 9))
-    ax.set_title('LISA Cluster Map for ' + columnName)
+    ax.set_title("LISA Cluster Map for " + columnName)
     # plt.savefig('LISA_Cluster_Map_for_' + columnName + '.png')
     plt.show()
 ```
 
 ```{python}
-local_moran(myData, "average_price")
 local_moran(myData, "Count_")
+local_moran(myData, "average_price")
 ```
+
+The cluster maps show that the distribution of Airbnb listings quantity is significantly clustered in inner and dispersed in outer London areas. The average price clusters are more scattered, with hotspots primarily in the central southwestern part of London and cold spots in the west, north, and southeast. The abundance of tourist resources and infrastructure in Inner London may contribute to a noticeable clustering of Airbnb's quantity and pricing in these areas. There is a clear demarcation between areas of high and low values, indicating significant differences in economic conditions and accommodation demand between these regions. Airbnb's average pricing is more susceptible to the degree of poverty in an area (Gutiérrez, García-Palomares, Romanillos, & Salas-Olmedo, 2017) @gutierrez2017eruption. We will now proceed to further investigate the relationship between seven poverty indicators and average pricing using GWR.
+
+### 7.3 Intersecting Correlations: Airbnb Pricing and Deprivation
+
+Given that Airbnb listing prices have an irregularly spatial distribution featuring clustering, we would like to explore the link between prices and the indicators of Deprivation. Imagine whether the prices of Airbnb listings are affected by the income and education level of the residents in the neighbourhood where they are located?
 
 ```{python}
 # GWR
 
-def run_gwr(myData,y_column):
-    x_list=["Employment Score (rate)",
-     "Education, Skills and Training Score",
-     "Health Deprivation and Disability Score",
-     "Crime Score",
-     "Barriers to Housing and Services Score",
-     "Living Environment Score"]
-    fig, ax = plt.subplots(2,3,figsize=(18, 9))
-    
+def run_gwr(myData, y_column):
+    x_list = [
+        "Employment Score (rate)",
+        "Education, Skills and Training Score",
+        "Health Deprivation and Disability Score",
+        "Crime Score",
+        "Barriers to Housing and Services Score",
+        "Living Environment Score",
+    ]
+    fig, ax = plt.subplots(2, 3, figsize=(18, 9))
+
     for i, x_column in enumerate(x_list):
         row = i // 3
         col = i % 3
-       
-        gdf=myData[[y_column,x_column,'geometry']].copy()
-        gdf['centro']=gdf.geometry.centroid
-        gdf['X']=gdf.centro.x
-        gdf['Y']=gdf.centro.y
-        coords = list(zip(gdf['X'],gdf['Y']))
-        
-        y=gdf[y_column].values.reshape((-1,1))
+
+        gdf = myData[[y_column, x_column, "geometry"]].copy()
+        gdf["centro"] = gdf.geometry.centroid
+        gdf["X"] = gdf.centro.x
+        gdf["Y"] = gdf.centro.y
+        coords = list(zip(gdf["X"], gdf["Y"]))
+
+        y = gdf[y_column].values.reshape((-1, 1))
         y = (y - y.mean(axis=0)) / y.std(axis=0)
-        X=gdf[[x_column]].values
+        X = gdf[[x_column]].values
         X = (X - X.mean(axis=0)) / X.std(axis=0)
-        
+
         sel = Sel_BW(coords, y, X)
         bw = sel.search()
         # print('bw:', bw)
@@ -424,37 +534,53 @@ def run_gwr(myData,y_column):
         # print('ENP:', gwr_results.ENP)
         # print('sigma2:', gwr_results.sigma2)
 
-    # The following code throws an error and interrupt on some of our group members' computer while others are not. 
-    # If an error occurs, please comment the next line, so that the output of coefficient visualisation would not be affected.
+        # The following code throws an error and interrupt on some of our group members' computer while others are not.
+        # If an error occurs, please comment the next line, so that the output of coefficient visualisation would not be affected.
         print(gwr_results.summary())
-        
-        gdf['coe'] = gwr_results.params[:, 1]
+
+        gdf["coe"] = gwr_results.params[:, 1]
         # gdf['r2'] = gwr_results.localR2
         # gdf['r2'] = np.clip(gdf['r2'], 0, 1)
-    
+
         # classifier_r2 = mc.NaturalBreaks(y=myData[y_column], k=5)
         classifier_coe = mc.NaturalBreaks(y=myData[x_column], k=5)
-    
+
         # gdf['r2_classified'] = gdf['r2'].apply(classifier_r2)
-        gdf['coe_classified'] = gdf['coe'].apply(classifier_coe)
-        
+        gdf["coe_classified"] = gdf["coe"].apply(classifier_coe)
+
         # gdf.plot(column='r2', cmap='coolwarm', legend=True, ax=ax[0])
-        gdf.plot(column='coe', cmap='coolwarm', legend=True, ax=ax[row, col])
+        gdf.plot(column="coe", cmap="coolwarm", legend=True, ax=ax[row, col])
         ax[row, col].set_title(f"{y_column}-{x_column}")
-        ax[row, col].axis('off')
+        ax[row, col].axis("off")
     # plt.savefig(f"{x_column}~{y_column}.png")
-    plt.show()
+    plt.show()  
 ```
 
 ```{python}
-run_gwr(myData,"average_price")
-run_gwr(myData,"Count_")
+run_gwr(myData, "average_price")
+run_gwr(myData, "Count_")
 ```
+
+Our Geographically Weighted Regression (GWR) analysis reveals a distinct pattern in central London boroughs like the City of London, Westminster, Kensington, Chelsea, and Hammersmith and Fulham. Here, Airbnb prices negatively correlate with indicators such as employment, health, education, and crime rates. This trend suggests that areas with higher deprivation scores see lower Airbnb prices, affected by factors like crime rates and limited infrastructure. Despite their central locations, these areas are less appealing to renters.
+
+The trend shifts as we move to the suburbs. The negative correlation between deprivation scores and Airbnb pricing weakens in areas like Barnet and Harrow. These suburban regions show a different dynamic, where high housing supply and lower demand drive prices down. A notable deviation is observed in living environment scores. In central areas, the aged infrastructure does not deter high Airbnb prices, likely due to the allure of prime locations and tourist attractions. In contrast, suburban Airbnb listings show a negative correlation, indicating a preference for newer, well-maintained properties in these less crowded areas.
+
+### 7.4 Conclusion: What can policy do?
+
+Our analysis indicates that in Inner London, Airbnb prices are negatively impacted by high poverty levels, particularly in areas with challenges in employment, education, health, and disability. This situation calls for a customized approach to Airbnb regulation in these neighborhoods.
+
+-   Inner London Measures:
+
+    For Inner London, we propose two key strategies to support diverse groups and enhance the Airbnb market. Firstly, we recommend economic incentives for special groups including individuals with disabilities, health issues, the unemployed. By offering short-term rental discounts to these groups, landlords would receive subsidies, fostering social equity and making housing more affordable. Secondly, we advocate for supportive partnerships with government rental programs (KeyNest, 2019) @keynest2019. These collaborations can provide security and financial benefits to landlords in disadvantaged areas, creating a more stable and equitable rental market in Inner London.
+
+-   Outer London Strategy:
+
+    In Outer London, our focus shifts to elevating the quality of Airbnb listings to boost market competitiveness. The strategy here emphasizes prioritizing high-quality listings. Implementing a quality assessment system will help regulate and elevate the standard of accommodations, ensuring only the best are available for rent. This measure aims to attract guests seeking high-standard accommodations and positions Outer London's Airbnb market as a provider of premium lodging experiences. By concentrating on quality over quantity,
 
 ## Sustainable Authorship Tools
 
 Your QMD file should automatically download your BibTeX file. We will then re-run the QMD file to generate the output successfully.
 
-Written in Markdown and generated from [Quarto](https://quarto.org/). Fonts used: [Spectral](https://fonts.google.com/specimen/Spectral) (mainfont), [Roboto](https://fonts.google.com/specimen/Roboto) (<span style="font-family:Sans-Serif;">sansfont</span>) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains%20Mono) (`monofont`). 
+Written in Markdown and generated from [Quarto](https://quarto.org/). Fonts used: [Spectral](https://fonts.google.com/specimen/Spectral) (mainfont), [Roboto](https://fonts.google.com/specimen/Roboto) ([sansfont]{style="font-family:Sans-Serif;"}) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains%20Mono) (`monofont`).
 
 ## References

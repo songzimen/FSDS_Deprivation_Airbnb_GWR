@@ -180,7 +180,7 @@ myData = gpd.GeoDataFrame(myData)
 
 :::
 
-The dataset for the study consists of two parts. The Airbnb data comes from **Inside Airbnb**, while the Deprivation data is from **the Department for Levelling Up, Housing & Communities**, which is part of the UK government.
+The dataset for the study consists of two parts. The Airbnb data comes from **Inside Airbnb** @insideairbnb, while the Deprivation data is from **the Department for Levelling Up, Housing & Communities** @englishindices2019, which is part of the UK government.
 
 ( 2 points; Answer due Week 7 )
 
@@ -490,7 +490,7 @@ local_moran(myData, "Count_")
 local_moran(myData, "average_price")
 ```
 
-The cluster maps show that the distribution of Airbnb listings quantity is significantly clustered in inner and dispersed in outer London areas. The average price clusters are more scattered, with hotspots primarily in the central southwestern part of London and cold spots in the west, north, and southeast. The abundance of tourist resources and infrastructure in Inner London may contribute to a noticeable clustering of Airbnb's quantity and pricing in these areas. There is a clear demarcation between areas of high and low values, indicating significant differences in economic conditions and accommodation demand between these regions. Airbnb's average pricing is more susceptible to the degree of poverty in an area (Gutiérrez, García-Palomares, Romanillos, & Salas-Olmedo, 2017). We will now proceed to further investigate the relationship between seven poverty indicators and average pricing using GWR.
+The cluster maps show that the distribution of Airbnb listings quantity is significantly clustered in inner and dispersed in outer London areas. The average price clusters are more scattered, with hotspots primarily in the central southwestern part of London and cold spots in the west, north, and southeast. The abundance of tourist resources and infrastructure in Inner London may contribute to a noticeable clustering of Airbnb's quantity and pricing in these areas. There is a clear demarcation between areas of high and low values, indicating significant differences in economic conditions and accommodation demand between these regions. Airbnb's average pricing is more susceptible to the degree of poverty in an area (Gutiérrez, García-Palomares, Romanillos, & Salas-Olmedo, 2017) @gutierrez2017eruption. We will now proceed to further investigate the relationship between seven poverty indicators and average pricing using GWR.
 
 ### 7.3 Intersecting Correlations: Airbnb Pricing and Deprivation
 
@@ -565,13 +565,13 @@ Our Geographically Weighted Regression (GWR) analysis reveals a distinct pattern
 
 The trend shifts as we move to the suburbs. The negative correlation between deprivation scores and Airbnb pricing weakens in areas like Barnet and Harrow. These suburban regions show a different dynamic, where high housing supply and lower demand drive prices down. A notable deviation is observed in living environment scores. In central areas, the aged infrastructure does not deter high Airbnb prices, likely due to the allure of prime locations and tourist attractions. In contrast, suburban Airbnb listings show a negative correlation, indicating a preference for newer, well-maintained properties in these less crowded areas.
 
-### 7.4 Conclusion：What can policy do?
+### 7.4 Conclusion: What can policy do?
 
 Our analysis indicates that in Inner London, Airbnb prices are negatively impacted by high poverty levels, particularly in areas with challenges in employment, education, health, and disability. This situation calls for a customized approach to Airbnb regulation in these neighborhoods.
 
 -   Inner London Measures:
 
-    For Inner London, we propose two key strategies to support diverse groups and enhance the Airbnb market. Firstly, we recommend economic incentives for special groups including individuals with disabilities, health issues, the unemployed. By offering short-term rental discounts to these groups, landlords would receive subsidies, fostering social equity and making housing more affordable. Secondly, we advocate for supportive partnerships with government rental programs (KeyNest, 2019). These collaborations can provide security and financial benefits to landlords in disadvantaged areas, creating a more stable and equitable rental market in Inner London.
+    For Inner London, we propose two key strategies to support diverse groups and enhance the Airbnb market. Firstly, we recommend economic incentives for special groups including individuals with disabilities, health issues, the unemployed. By offering short-term rental discounts to these groups, landlords would receive subsidies, fostering social equity and making housing more affordable. Secondly, we advocate for supportive partnerships with government rental programs (KeyNest, 2019) @keynest2019. These collaborations can provide security and financial benefits to landlords in disadvantaged areas, creating a more stable and equitable rental market in Inner London.
 
 -   Outer London Strategy:
 
